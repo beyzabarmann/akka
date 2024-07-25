@@ -1,0 +1,81 @@
+import akka.actor.typed.ActorSystem;
+import akka.actor.typed.Behavior;
+import akka.actor.typed.javadsl.Behaviors;
+
+public class HelloWorld {
+    public static void main(String[] args) {
+        final ActorSystem<String> system = ActorSystem.create(HelloWorld.create(), "helloakka");
+
+        system.tell("Hello, Akka!");
+    }
+
+    public static Behavior<String> create() {
+        return Behaviors.receive((context, message) -> {
+            System.out.println("Received: " + message);
+            return Behaviors.same();
+        });
+    }
+}
+
+
+AKTÖRLER ARASI MESAJLAŞMA
+
+import akka.actor.typed.ActorRef;
+import akka.actor.typed.ActorSystem;
+import akka.actor.typed.Behavior;
+import akka.actor.typed.javadsl.Behaviors;
+
+public class HelloWorldMain {
+
+    public static void main(String[] args) {
+        final ActorSystem<HelloWorldMain.Start> system = ActorSystem.create(HelloWorldMain.create(), "helloakka");
+
+        final ActorRef<HelloWorld.Greet> greeter = system.systemActorOf(HelloWorld.create(), "greeter");
+        system.tell(new HelloWorldMain.Start(greeter));
+    }
+
+    public static Behavior<Start> create() {
+        return Behaviors.setup(context -> Behaviors.receiveMessage(start -> {
+            start.greeter.tell(new HelloWorld.Greet("Akka", context.getSelf()));
+            return Behaviors.same();
+        }));
+    }
+
+    public static class Start {
+        public final ActorRef<HelloWorld.Greet> greeter;
+
+        public Start(ActorRef<HelloWorld.Greet> greeter) {
+            this.greeter = greeter;
+        }
+    }
+}
+
+class HelloWorld {
+    public static class Greet {
+        public final String whom;
+        public final ActorRef<Greeted> replyTo;
+
+        public Greet(String whom, ActorRef<Greeted> replyTo) {
+            this.whom = whom;
+            this.replyTo = replyTo;
+        }
+    }
+
+    public static class Greeted {
+        public final String whom;
+        public final ActorRef<Greet> from;
+
+        public Greeted(String whom, ActorRef<Greet> from) {
+            this.whom = whom;
+            this.from = from;
+        }
+    }
+
+    public static Behavior<Greet> create() {
+        return Behaviors.receive((context, message) -> {
+            System.out.println("Hello " + message.whom + "!");
+            message.replyTo.tell(new Greeted(message.whom, context.getSelf()));
+            return Behaviors.same();
+        });
+    }
+}
